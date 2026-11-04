@@ -1,0 +1,9 @@
+_build
+deps
+data
+.git
+.env*
+*.pem
+*.key
+.claude/settings.local.json
+sipphone.zip

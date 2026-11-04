@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIP Phone</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.6a1 1 0 0 1-.25 1z"/></svg>
+      <span>SIP Phone</span>
+    </div>
+    <div class="top-actions">
+      <span id="conn" class="pill off">offline</span>
+      <button id="btnFiles" class="ghost small">Project files</button>
+      <button id="btnLog" class="ghost small">SIP log</button>
+      <button id="btnAppLog" class="ghost small">Elixir log</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card">
+      <div class="card-head">
+        <h2>Accounts</h2>
+        <button id="btnAdd" class="ghost small">+ Add</button>
+      </div>
+      <ul id="accountList" class="account-list"></ul>
+      <p id="noAccounts" class="muted">No accounts yet. Add one to register on your PBX, or leave the registrar empty to make direct calls only.</p>
+    </section>
+
+    <section class="card">
+      <h2>Dial</h2>
+      <label class="field">Call from
+        <select id="fromSel"></select>
+      </label>
+      <label class="field">Number or address
+        <input id="target" autocomplete="off" spellcheck="false" placeholder="1001 &middot; 127.0.0.1:5071 &middot; sip:bob@host:5070">
+      </label>
+      <div id="keypad" class="keypad"></div>
+      <div class="row">
+        <button id="btnCall" class="primary big">Call</button>
+        <button id="btnBack" class="ghost" title="Delete last character">&#9003;</button>
+      </div>
+      <p class="hint">Direct call: type <code>host:port</code> of another phone, e.g. <code>127.0.0.1:5071</code>.</p>
+    </section>
+
+    <section class="card">
+      <h2>Calls</h2>
+      <ul id="callList" class="call-list"></ul>
+      <p id="noCalls" class="muted">No active calls.</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Account: basic settings -->
+  <dialog id="accountDlg">
+    <form method="dialog" id="accountForm" class="dlg">
+      <h3 id="accountTitle">Add account</h3>
+      <label class="field">Account name
+        <input id="f_name" autocomplete="off" placeholder="Office line">
+      </label>
+      <label class="field">Username
+        <input id="f_username" autocomplete="off" placeholder="1001">
+      </label>
+      <label class="field">Password
+        <input id="f_password" type="password" autocomplete="new-password">
+      </label>
+      <label class="field">Registrar (PBX)
+        <input id="f_registrar" autocomplete="off" spellcheck="false" placeholder="192.168.1.10:5060 &mdash; empty = direct calls only">
+      </label>
+      <div class="dlg-actions">
+        <button type="button" id="btnAdvanced" class="ghost">Advanced&hellip;</button>
+        <span class="spacer"></span>
+        <button type="button" id="btnDelete" class="danger ghost" hidden>Delete</button>
+        <button type="button" id="btnAccCancel" class="ghost">Cancel</button>
+        <button type="button" id="btnAccSave" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Account: advanced settings (pop-up on top of the basic one) -->
+  <dialog id="advDlg">
+    <div class="dlg">
+      <h3>Advanced settings</h3>
+      <div class="grid2">
+        <label class="field">Caller display name
+          <input id="f_display" autocomplete="off">
+        </label>
+        <label class="field">Auth username
+          <input id="f_auth" autocomplete="off" placeholder="same as username">
+        </label>
+        <label class="field">SIP domain
+          <input id="f_domain" autocomplete="off" placeholder="registrar host">
+        </label>
+        <label class="field">Outbound proxy
+          <input id="f_proxy" autocomplete="off" placeholder="host:port">
+        </label>
+        <label class="field">Local SIP port (UDP)
+          <input id="f_port" inputmode="numeric" placeholder="auto (5070+)">
+        </label>
+        <label class="field">Advertised address
+          <input id="f_adv" autocomplete="off" placeholder="auto-detected">
+        </label>
+        <label class="field">Register expiry (s)
+          <input id="f_expires" inputmode="numeric" value="300">
+        </label>
+        <label class="field">Preferred codec
+          <select id="f_codec">
+            <option value="pcmu">PCMU (G.711 &micro;-law)</option>
+            <option value="pcma">PCMA (G.711 A-law)</option>
+          </select>
+        </label>
+      </div>
+      <label class="check"><input id="f_register" type="checkbox" checked> Register with the registrar</label>
+      <label class="check"><input id="f_auto" type="checkbox"> Auto-answer incoming calls</label>
+      <p class="hint">Local port: every account owns one UDP port, so other phones can call it directly at <code>host:port</code>. Advertised address: set it to your host IP when running in bridge-network Docker.</p>
+      <div class="dlg-actions">
+        <span class="spacer"></span>
+        <button type="button" id="btnAdvClose" class="primary">Done</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- In-call keypad -->
+  <dialog id="dtmfDlg">
+    <div class="dlg narrow">
+      <h3>Keypad</h3>
+      <div id="dtmfPad" class="keypad"></div>
+      <div class="dlg-actions">
+        <span class="spacer"></span>
+        <button type="button" id="btnDtmfClose" class="primary">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- SIP trace -->
+  <dialog id="logDlg" class="wide">
+    <div class="dlg">
+      <h3>SIP log</h3>
+      <div id="logBox" class="logbox"></div>
+      <div class="dlg-actions">
+        <button type="button" id="btnLogClear" class="ghost">Clear</button>
+        <span class="spacer"></span>
+        <button type="button" id="btnLogClose" class="primary">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Elixir (Logger) log -->
+  <dialog id="appLogDlg" class="wide">
+    <div class="dlg">
+      <h3>Elixir log</h3>
+      <div class="row2">
+        <label class="field grow">Filter
+          <input id="appLogFilter" autocomplete="off" spellcheck="false" placeholder="text&hellip;">
+        </label>
+        <label class="field port">Level
+          <select id="appLogLevel">
+            <option value="debug">debug+</option>
+            <option value="info" selected>info+</option>
+            <option value="warning">warning+</option>
+            <option value="error">error</option>
+          </select>
+        </label>
+      </div>
+      <div id="appLogBox" class="logbox applog"></div>
+      <div class="dlg-actions">
+        <button type="button" id="btnAppLogClear" class="ghost">Clear</button>
+        <button type="button" id="btnAppLogCopy" class="ghost">Copy</button>
+        <label class="check"><input type="checkbox" id="appLogFollow" checked> Follow</label>
+        <span class="spacer"></span>
+        <button type="button" id="btnAppLogClose" class="primary">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Project files (read only) -->
+  <dialog id="filesDlg" class="wide">
+    <div class="dlg">
+      <h3>Project files <span class="muted">&middot; read only</span></h3>
+      <div class="files">
+        <ul id="fileList" class="filelist"></ul>
+        <div class="fileview">
+          <div id="fileName" class="muted">Select a file</div>
+          <pre id="fileView"></pre>
+        </div>
+      </div>
+      <p class="hint">Private files (saved accounts, keys, env files, local settings) are never listed or served.</p>
+      <div class="dlg-actions">
+        <span class="spacer"></span>
+        <button type="button" id="btnFilesClose" class="primary">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>

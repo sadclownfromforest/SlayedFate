@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git send-pack:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Edit(.claude/settings.json)",
+      "Edit(.claude/settings.local.json)",
+      "Edit(.claude/hooks/**)",
+      "Write(.claude/settings.json)",
+      "Write(.claude/settings.local.json)",
+      "Write(.claude/hooks/**)"
+    ],
+    "ask": [
+      "Bash(git commit:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

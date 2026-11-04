@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIP Test</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M9 2h6v2h-1v5.6l5.4 9A2 2 0 0 1 17.7 22H6.3a2 2 0 0 1-1.7-3.4L10 9.6V4H9V2zm3 9.2L7.9 18h8.2L12 11.2z"/></svg>
+      <span>SIP Test</span>
+    </div>
+    <div class="top-actions">
+      <span id="conn" class="pill off">offline</span>
+      <button id="btnTrace" class="ghost small">SIP trace</button>
+      <button id="btnExport" class="ghost small">Export JSON</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div class="col">
+      <section class="card">
+        <h2>Target</h2>
+        <div class="row2">
+          <label class="field grow">Phone / server IP
+            <input id="t_host" autocomplete="off" spellcheck="false" placeholder="127.0.0.1">
+          </label>
+          <label class="field port">Port
+            <input id="t_port" inputmode="numeric" placeholder="5060">
+          </label>
+        </div>
+        <label class="field">Called user (number)
+          <input id="t_to" autocomplete="off" spellcheck="false" placeholder="1000">
+        </label>
+        <div class="row">
+          <button id="btnRun" class="primary big">Run selected</button>
+          <button id="btnStop" class="hang" hidden>Stop</button>
+        </div>
+        <div class="row">
+          <button id="btnRunAll" class="ghost">Run all</button>
+          <button id="btnAdv" class="ghost">Advanced&hellip;</button>
+        </div>
+        <p class="hint">Enter <code>ip</code> and <code>port</code> of the phone (e.g. <code>127.0.0.1</code> : <code>5070</code>) or of a registrar / PBX.</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Scenarios</h2>
+          <span>
+            <button id="btnAll" class="ghost small">All</button>
+            <button id="btnNone" class="ghost small">None</button>
+          </span>
+        </div>
+        <div id="scList"></div>
+      </section>
+    </div>
+
+    <section class="card results">
+      <div class="card-head">
+        <h2>Results</h2>
+        <span id="summary" class="muted"></span>
+      </div>
+      <div id="bar" class="bar" hidden><div id="barFill"></div></div>
+      <div id="resList"></div>
+      <p id="noRes" class="muted">Nothing run yet. Pick scenarios on the left and press <b>Run selected</b>.
+        Scenarios that ring a real phone (calls) need you to answer or decline on the phone when the step says so.</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Advanced settings -->
+  <dialog id="advDlg">
+    <div class="dlg">
+      <h3>Advanced settings</h3>
+      <div class="grid2">
+        <label class="field">From user (our identity)
+          <input id="a_from" autocomplete="off" placeholder="tester">
+        </label>
+        <label class="field">Display name
+          <input id="a_display" autocomplete="off" placeholder="SIPtest">
+        </label>
+        <label class="field">SIP domain
+          <input id="a_domain" autocomplete="off" placeholder="target host[:port]">
+        </label>
+        <label class="field">Auth username
+          <input id="a_auth_user" autocomplete="off" placeholder="same as From user">
+        </label>
+        <label class="field">Auth password
+          <input id="a_password" type="password" autocomplete="new-password">
+        </label>
+        <label class="field">Local UDP port
+          <input id="a_local_port" inputmode="numeric" placeholder="0 = any free port">
+        </label>
+        <label class="field">Our address (Via / Contact)
+          <input id="a_local_host" autocomplete="off" placeholder="auto-detected">
+        </label>
+        <label class="field">RTP port in SDP
+          <input id="a_rtp" inputmode="numeric" placeholder="40000">
+        </label>
+        <label class="field">Response timeout (ms)
+          <input id="a_timeout" inputmode="numeric" placeholder="5000">
+        </label>
+        <label class="field">Ringing / answer timeout (ms)
+          <input id="a_ring" inputmode="numeric" placeholder="30000">
+        </label>
+      </div>
+      <p class="hint">The password is used only for the current run and is not stored. Everything else is remembered in this browser.</p>
+      <div class="dlg-actions">
+        <span class="spacer"></span>
+        <button type="button" id="btnAdvClose" class="primary">Done</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Script viewer / editor -->
+  <dialog id="scriptDlg" class="wide">
+    <div class="dlg">
+      <h3 id="scriptTitle">Script</h3>
+      <p id="scriptDesc" class="muted"></p>
+      <textarea id="scriptText" spellcheck="false" rows="14"></textarea>
+      <details class="syntax">
+        <summary>Script syntax</summary>
+        <pre>send METHOD [expires=N] [max-forwards=N] [to=USER] [sdp=none|bad] [dialog]
+ack                       # 2xx of the last INVITE (non-2xx are ACKed automatically)
+auth [wrong]              # answer the last 401/407 with digest credentials
+expect 180 183 [METHOD] [timeout=MS|ring]   # other 1xx are skipped
+expect-request BYE [timeout=MS]             # request sent by the phone (answered 200)
+wait MS
+assert-header allow contains INVITE
+assert-body contains m=audio</pre>
+      </details>
+      <div class="dlg-actions">
+        <button type="button" id="btnScriptReset" class="ghost">Reset</button>
+        <span class="spacer"></span>
+        <button type="button" id="btnScriptClose" class="ghost">Close</button>
+        <button type="button" id="btnScriptRun" class="primary">Run this script</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- SIP trace -->
+  <dialog id="traceDlg" class="wide">
+    <div class="dlg">
+      <h3>SIP trace</h3>
+      <label class="field">Scenario
+        <select id="traceSel"></select>
+      </label>
+      <div id="traceBox" class="logbox"></div>
+      <div class="dlg-actions">
+        <button type="button" id="btnTraceClear" class="ghost">Clear</button>
+        <span class="spacer"></span>
+        <button type="button" id="btnTraceClose" class="primary">Close</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>

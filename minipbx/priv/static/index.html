@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MiniPBX</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.6a1 1 0 0 1-.25 1z"/></svg>
+      <span>MiniPBX</span>
+    </div>
+    <div class="top-actions">
+      <span id="sipaddr" class="pill">SIP &hellip;</span>
+      <span id="conn" class="pill off">offline</span>
+      <button id="btnSettings" class="ghost small">Settings&hellip;</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div class="col">
+      <section class="card">
+        <div class="card-head">
+          <h2>Phones</h2>
+          <button id="btnAddExt" class="small primary">Add</button>
+        </div>
+        <ul id="extList" class="account-list"></ul>
+        <p class="hint">A phone registers with its number as user name and the password you set. Server: the SIP address above.</p>
+      </section>
+
+      <section class="card">
+        <h2>Live calls</h2>
+        <ul id="callList" class="call-list"></ul>
+        <p id="noCalls" class="muted">No calls right now.</p>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card">
+        <div class="card-head">
+          <h2>Call log</h2>
+          <span>
+            <a id="btnCsv" class="linkbtn" href="/cdr.csv" download="cdr.csv">Export CSV</a>
+            <button id="btnClear" class="ghost small danger">Clear</button>
+          </span>
+        </div>
+        <div class="row2">
+          <label class="field grow">Filter
+            <input id="cdrFilter" autocomplete="off" spellcheck="false" placeholder="number, status, reason&hellip;">
+          </label>
+          <label class="field port">Result
+            <select id="cdrDisp">
+              <option value="">All</option>
+              <option>ANSWERED</option>
+              <option>NO ANSWER</option>
+              <option>BUSY</option>
+              <option>FAILED</option>
+            </select>
+          </label>
+        </div>
+        <div class="tablewrap">
+          <table id="cdrTable">
+            <thead><tr><th>Date / time</th><th>From</th><th>Dialed</th><th>Rang</th><th>Result</th><th>Talk</th><th>Details</th></tr></thead>
+            <tbody id="cdrBody"></tbody>
+          </table>
+        </div>
+        <p id="noCdr" class="muted">No calls recorded yet.</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Reroute numbers</h2>
+          <button id="btnAddRoute" class="small primary">Add</button>
+        </div>
+        <ul id="routeList" class="account-list"></ul>
+        <p id="noRoutes" class="muted">No routes. A call to a number goes straight to that phone.</p>
+        <p class="hint">The first matching route wins, top to bottom. Patterns: <code>100</code>, <code>_1XX</code>, <code>_9.</code>. Each phone can also forward (always / busy / no answer / unreachable) &mdash; edit the phone.</p>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="dlgExt">
+    <form method="dialog" class="dlg" id="extForm">
+      <h3 id="extTitle">Phone</h3>
+      <div class="grid2">
+        <label class="field">Number (user name)
+          <input id="e_number" autocomplete="off" spellcheck="false" maxlength="16" placeholder="1001">
+        </label>
+        <label class="field">Name
+          <input id="e_name" autocomplete="off" maxlength="40" placeholder="Alice">
+        </label>
+      </div>
+      <label class="field">Password
+        <input id="e_password" type="password" autocomplete="new-password" placeholder="">
+      </label>
+      <p id="e_pwhint" class="hint" hidden>Leave empty to keep the current password.</p>
+      <h2 class="subhead">Call forwarding</h2>
+      <div class="grid2">
+        <label class="field">Always to
+          <input id="e_fa" autocomplete="off" maxlength="16" placeholder="number">
+        </label>
+        <label class="field">When busy to
+          <input id="e_fb" autocomplete="off" maxlength="16" placeholder="number">
+        </label>
+        <label class="field">No answer to
+          <input id="e_fn" autocomplete="off" maxlength="16" placeholder="number">
+        </label>
+        <label class="field">Not registered to
+          <input id="e_fu" autocomplete="off" maxlength="16" placeholder="number">
+        </label>
+      </div>
+      <div class="dlg-actions">
+        <button type="button" id="e_delete" class="danger small" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button type="button" id="e_cancel" class="ghost">Cancel</button>
+        <button type="submit" class="primary" id="e_save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlgRoute">
+    <form method="dialog" class="dlg" id="routeForm">
+      <h3 id="routeTitle">Route</h3>
+      <label class="field">When the dialed number matches
+        <input id="r_pattern" autocomplete="off" spellcheck="false" maxlength="40" placeholder="100 or _1XX">
+      </label>
+      <label class="field">Call this number instead
+        <input id="r_target" autocomplete="off" spellcheck="false" maxlength="40" placeholder="1001 or ${EXTEN}">
+      </label>
+      <label class="field">Note
+        <input id="r_note" autocomplete="off" maxlength="80" placeholder="optional">
+      </label>
+      <label class="check"><input type="checkbox" id="r_enabled" checked> Enabled</label>
+      <p class="hint"><code>X</code> = 0-9, <code>Z</code> = 1-9, <code>N</code> = 2-9, a final <code>.</code> = anything. <code>${EXTEN}</code> in the target is the dialed number.</p>
+      <div class="dlg-actions">
+        <button type="button" id="r_delete" class="danger small" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button type="button" id="r_cancel" class="ghost">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlgSettings">
+    <form method="dialog" class="dlg" id="setForm">
+      <h3>Settings</h3>
+      <label class="field">Ring time before &ldquo;no answer&rdquo; (seconds)
+        <input id="s_ring" inputmode="numeric" placeholder="30">
+      </label>
+      <label class="field">Address phones use to reach the PBX (optional)
+        <input id="s_host" autocomplete="off" spellcheck="false" placeholder="auto">
+      </label>
+      <label class="field">Realm
+        <input id="s_realm" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="hint">The realm is baked into every stored password hash, so it can only change while there are no phones.</p>
+      <label class="check"><input type="checkbox" id="s_auth"> Require a password to place calls</label>
+      <div class="dlg-actions">
+        <span class="spacer"></span>
+        <button type="button" id="s_cancel" class="ghost">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
